@@ -1,3 +1,3 @@
 
 ge:
-	g++ main.cc -o  ge -pthread -mpopcnt -march=native
+	g++ main.cc -o  ge -O2 -pthread -mpopcnt -march=native

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <ctime>
 #include <iostream>
+#include <unordered_map>
 #include<tmmintrin.h>
 #include<xmmintrin.h>
 #include<emmintrin.h>
@@ -18,6 +19,7 @@
 #include <x86intrin.h>
 
 typedef std::chrono::steady_clock::time_point ctime_t;
+typedef uint64_t* linepoint;
 
 void printBits(uint64_t const value) {  
     for (int i = 63; i >= 0; --i) {  
@@ -114,4 +116,9 @@ private:
     std::vector<ctime_t> start_times;
     std::vector<ctime_t> end_times;
     std::string name_;
+};
+
+struct Conmap {
+    RWLock rw;
+    linepoint* map;
 };

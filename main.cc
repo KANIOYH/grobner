@@ -3,11 +3,11 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
-#include <list>
-#include <map>
+
 #include <sstream>
 #include <thread>
 #include <vector>
+#include <unordered_map>
 
 #include<tmmintrin.h>
 #include<xmmintrin.h>
@@ -20,6 +20,7 @@
 
 #include "util.h"
 using namespace::std;
+
 
 int first(uint64_t *line, int size) {
     int bitmap_size =  (size + 63) >> 6;
@@ -168,9 +169,10 @@ public:
         } else {
             std::cout << "not  type" << std::endl;
         }
+        emap = (linepoint*)malloc(sizeof(linepoint)* (col_size+elements.size()));
+        memset(emap, 0, sizeof(linepoint)* (col_size+elements.size()));
         for(auto it:eliminators) {
             auto epos = first(it,col_size);
-            // printf("%d\n",epos);
             emap[epos] = it;
         }
 
@@ -183,7 +185,7 @@ public:
                 if(pos < 0) { //all zero
                     break;
                 }
-                if(emap.find(pos)!=emap.end()) {
+                if(emap[pos]) {
                     xorfunc(ele, emap[pos], col_size);
                 } else {
                     emap[pos] = ele;
@@ -205,10 +207,13 @@ public:
             std::cout << "not  type" << std::endl;
         }
 
+        emap = (linepoint*)malloc(sizeof(linepoint)* (col_size+elements.size()));
+        memset(emap, 0, sizeof(linepoint)* (col_size+elements.size()));
         for(auto it:eliminators) {
             auto epos = first(it,col_size);
             emap[epos] = it;
         }
+
         std::thread threads[pp_number];
         for(int i=0;i<pp_number;i++) {
             threads[i] = std::thread([&, idx=i](){
@@ -222,19 +227,20 @@ public:
                             flag = false;
                             break;
                         }
-                        rw.readLock();
-                        if(emap.find(pos)!=emap.end()) {
-                            auto epos = emap[pos];
-                            rw.readUnlock();
-                            xorfunc(ele, epos, col_size);
+                        int bid = pos % bucket_count;
+                        buckets[bid].rw.readLock();
+                        if(emap[pos]) {
+                            auto er = emap[pos];
+                            buckets[bid].rw.readUnlock();
+                            xorfunc(ele, er, col_size);
                         } else {
-                            rw.readUnlock();
-                            rw.writeLock();
-                            if(emap.find(pos)==emap.end()) {
+                            buckets[bid].rw.readUnlock();
+                            buckets[bid].rw.writeLock();
+                            if(!emap[pos]) {
                                 emap[pos] = ele;
                                 flag = false;
                             }
-                            rw.writeUnlock();
+                            buckets[bid].rw.writeUnlock();
                         }
                     } 
                     id += pp_number;
@@ -246,14 +252,13 @@ public:
         }
     }
 
-
-
     vector<uint64_t *> eliminators;     // 消元子
-    map<int,uint64_t *> emap;           // 记录首位
+    linepoint* emap;
+    // unordered_map<int,uint64_t *> emap;           // 记录首位 串行版
     vector<uint64_t *> elements;        // 被消元行
     long col_size;
-    RWLock rw;
-    mutex mu;
+    Conmap buckets[32];
+    int bucket_count = 32;
 };
 
 int main(int argc, char * argv[]) {
@@ -291,6 +296,8 @@ int main(int argc, char * argv[]) {
     size.push_back(3799);
     test.push_back("data/测试样例7 矩阵列数8399，非零消元子6375，被消元行4535");
     size.push_back(8399);
+    test.push_back("data/测试样例8 矩阵列数23045，非零消元子18748，被消元行14325");
+    size.push_back(23045);
     test.push_back("data/测试样例9 矩阵列数37960，非零消元子29304，被消元行14921");
     size.push_back(37960);
     test.push_back("data/测试样例10 矩阵列数43577，非零消元子39477，被消元行54274");
